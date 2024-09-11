@@ -1,0 +1,302 @@
+---
+title: "Influenza A H7N9 in China, 2013"
+format:
+  dashboard: 
+    embed-resources: true
+theme: lux
+---
+
+```{r results='hide'}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(tidyverse, outbreaks, bslib, bsicons, shiny, 
+               rgeoboundaries, plotly, htmltools, reactable)
+
+# view data
+head(outbreaks::fluH7N9_china_2013)
+```
+
+
+```{r results='hide'}
+#row 1 setup
+
+# TOTAL CASES SETUP
+total_cases <- nrow(fluH7N9_china_2013)
+
+sparkline_total <- plot_ly(na.omit(fluH7N9_china_2013)) %>%
+  add_lines(
+    x = ~date_of_onset, 
+    y = ~case_id,  # Cumulative count of entries
+    color = I("white"),
+    span = I(1),
+    fill = 'tozeroy', 
+    alpha = 0.2,
+    text = ~paste(format(date_of_onset, "%B %d"), "<br>Cases:", case_id),
+  hoverinfo = 'text'
+  ) %>%
+  layout(
+    xaxis = list(visible = F, showgrid = F, title = ""),
+    yaxis = list(visible = F, showgrid = F, title = ""),
+    hovermode = "x",
+    margin = list(t = 0, r = 0, l = 0, b = 0),
+    font = list(color = "white"),
+    paper_bgcolor = "transparent",
+    plot_bgcolor = "transparent",
+    hoverlabel = list(font = list(size = 10))
+  ) %>%
+  config(displayModeBar = F) %>%
+  htmlwidgets::onRender(
+    "function(el) {
+      el.closest('.bslib-value-box')
+        .addEventListener('bslib.card', function(ev) {
+          Plotly.relayout(el, {'xaxis.visible': ev.detail.fullScreen});
+        })
+    }"
+  )
+```
+
+
+```{r results='hide'}
+# Row 1 setup
+# TOTAL HOSPITALIZATIONS SETUP
+
+total_hosps <- fluH7N9_china_2013 %>% 
+  filter(!is.na(date_of_hospitalisation)) %>% 
+  count()
+
+total_hosps_df <- fluH7N9_china_2013 %>% 
+  select(date_of_hospitalisation) %>% 
+  filter(!is.na(date_of_hospitalisation)) %>% 
+  mutate(cum_hosps = row_number())
+
+
+sparkline_hosps <- plot_ly(total_hosps_df) %>%
+  add_lines(
+    x = ~date_of_hospitalisation, 
+    y = ~cum_hosps,
+    color = I("white"),
+    span = I(1),
+    fill = 'tozeroy', 
+    alpha = 0.2,
+    text = ~paste(format(date_of_hospitalisation, "%B %d"), "<br>Hospitalizations:", cum_hosps),
+  hoverinfo = 'text'
+  ) %>%
+  layout(
+    xaxis = list(visible = F, showgrid = F, title = ""),
+    yaxis = list(visible = F, showgrid = F, title = ""),
+    hovermode = "x",
+    margin = list(t = 0, r = 0, l = 0, b = 0),
+    font = list(color = "white"),
+    paper_bgcolor = "transparent",
+    plot_bgcolor = "transparent",
+    hoverlabel = list(font = list(size = 9))
+  ) %>%
+  config(displayModeBar = F) %>%
+  htmlwidgets::onRender(
+    "function(el) {
+      el.closest('.bslib-value-box')
+        .addEventListener('bslib.card', function(ev) {
+          Plotly.relayout(el, {'xaxis.visible': ev.detail.fullScreen});
+        })
+    }"
+  )
+
+```
+
+```{r results='hide'}
+# Row 1 Setup
+# TOTAL DEATHS SETUP
+
+total_deaths <- fluH7N9_china_2013 %>% 
+  filter(outcome == "Death") %>% 
+  count()
+
+total_deaths_df <- fluH7N9_china_2013 %>% 
+  select(date_of_outcome, outcome) %>% 
+  filter(outcome == "Death", !is.na(date_of_outcome)) %>% 
+  mutate(cum_deaths = row_number())
+# two values will be missing
+
+
+sparkline_deaths <- plot_ly(total_deaths_df) %>%
+  add_lines(
+    x = ~date_of_outcome, 
+    y = ~cum_deaths,
+    color = I("white"),
+    span = I(1),
+    fill = 'tozeroy', 
+    alpha = 0.2,
+    text = ~paste(format(date_of_outcome, "%B %d"), "<br>Deaths:", cum_deaths),
+  hoverinfo = 'text'
+  ) %>%
+  layout(
+    xaxis = list(visible = F, showgrid = F, title = ""),
+    yaxis = list(visible = F, showgrid = F, title = ""),
+    hovermode = "x",
+    margin = list(t = 0, r = 0, l = 0, b = 0),
+    font = list(color = "white"),
+    paper_bgcolor = "transparent",
+    plot_bgcolor = "transparent",
+    hoverlabel = list(font = list(size = 10))
+  ) %>%
+  config(displayModeBar = F) %>%
+  htmlwidgets::onRender(
+    "function(el) {
+      el.closest('.bslib-value-box')
+        .addEventListener('bslib.card', function(ev) {
+          Plotly.relayout(el, {'xaxis.visible': ev.detail.fullScreen});
+        })
+    }"
+  )
+
+```
+
+```{r results='hide'}
+#row 2 setup
+
+###CASES PER PROVINCE BAR PLOT SETUP
+
+cases_by_province <- fluH7N9_china_2013 %>% 
+  group_by(province) %>% 
+  summarize(cases = n()) %>% 
+#count can work here too 
+    mutate(tooltip_label_a = paste(province, 
+                               cases, 
+                               sep = ": ")) 
+
+cases_by_province_plot <- ggplot(data = cases_by_province, aes(y = reorder(province, cases), 
+             x = cases, 
+             text = tooltip_label_a)) + 
+  geom_col(fill = "#4484b4") + 
+  labs(y = "", 
+       x = "Number of Cases") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+```{r results='hide'}
+pacman::p_load(outbreaks, rgeoboundaries, plotly)
+
+
+### MAP OF CASES PER PROVINCE SETUP
+province_summary <- fluH7N9_china_2013 %>% 
+  group_by(province) %>% 
+  summarise(total_cases = n()) 
+
+china_map <- rgeoboundaries::gb_adm1("china")
+
+# Check the keys to see if join will be successful
+setdiff(province_summary$province, china_map$shapeName)
+setdiff(china_map$shapeName, province_summary$province)
+# Some work to be done to harmonize these
+
+china_map <- china_map %>%
+  # Remove the strings Province, Municipality and Autonomous Region 
+  # to allow matching
+  mutate(province = str_trim(
+    str_remove(shapeName, "Province|Municipality|Autonomous Region")
+  ))
+
+# Check if join will work fine
+setdiff(province_summary$province, china_map$province)
+
+# Fix Guangdong, which based on a quick Google is actually Guangzhou
+china_map <- china_map %>% 
+  mutate(province = if_else(province == "Guangzhou", "Guangdong", province)) 
+  
+# Check again
+setdiff(province_summary$province, china_map$province)
+
+# Now join
+china_map_joined <- 
+  left_join(china_map, province_summary, by = "province") %>% 
+  # Create tooltip label 
+  mutate(tooltip_label = paste0(province, ": ", total_cases))
+
+china_map_plot <- ggplot(china_map_joined) +
+  geom_sf(aes(fill = total_cases, text = tooltip_label)) + 
+  theme_void() +
+  labs(fill = "Number of Cases") + 
+  theme(legend.position = "none")
+
+china_map_plot_ggplotly <- 
+  ggplotly(china_map_plot, tooltip = "text")
+```
+
+
+# HOME 
+
+## Row 1 {height=20%}
+
+```{r}
+
+
+value_box(
+  title = "Total Cases",
+  value = total_cases,
+  showcase = sparkline_total,
+  fullscreen = TRUE,
+  #showcase = bsicons::bs_icon("virus"),
+  theme = value_box_theme(bg = "#518fd6")
+)
+```
+
+```{r}
+#bootstrap valuebox hosps
+value_box(
+  title = "Total Hospitalizations",
+  value = total_hosps,
+  showcase = sparkline_hosps,
+  full_screen = TRUE,
+  #showcase = bsicons::bs_icon("hospital"),
+  theme = value_box_theme(bg = "#214773")
+)
+```
+
+```{r}
+#bootstrap valuebox deaths
+value_box(
+  title = "Total Deaths",
+  value = total_deaths,
+  showcase = sparkline_deaths,
+  #showcase = bsicons::bs_icon("file-medical"),
+  theme = value_box_theme(bg = "#3f71ab")
+)
+```
+
+## Row 2 {height=80%}
+
+### {width=35%}
+
+```{r title = "Number of Cases by Province"}
+ggplotly(cases_by_province_plot, tooltip = "text")
+```
+
+
+### {width=65%}
+
+```{r title = "Map of Provinces by Number of Cases"}
+china_map_plot_ggplotly
+```
+
+
+# DOWNLOAD DATA
+
+```{r}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(htmltools, reactable, gapminder)
+
+htmltools::browsable(
+  tagList(
+    reactable(fluH7N9_china_2013, 
+              elementId = "flu-table", 
+              searchable = T, 
+              filterable = T), 
+    
+tags$button("Download as CSV", 
+            onclick = "Reactable.downloadDataCSV('flu-table')")
+  )
+)
+```
