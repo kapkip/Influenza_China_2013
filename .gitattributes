@@ -5,7 +5,7 @@
 *.qmd linguist-language=R
 
 # 2. Ignore autogen stuff
-main_dash_livecode_files/** linguist-vendored
+index_files/** linguist-vendored
 
 # 3. I promise this is R
 *.html linguist-vendored
